@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Display};
 
-use super::{parser::AST, Instruction};
+use super::{parser::Ast, Instruction};
 use crate::helper::safe_add;
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ struct Generator {
 }
 
 /// Generates code
-pub fn gen_code(ast: &AST) -> Result<Vec<Instruction>, CodeGenError> {
+pub fn gen_code(ast: &Ast) -> Result<Vec<Instruction>, CodeGenError> {
     let mut generator = Generator::default();
     generator.gen_code(ast)?;
     Ok(generator.insts)
@@ -37,14 +37,14 @@ impl Generator {
         safe_add(&mut self.pc, &1, || CodeGenError::PCOverFlow)
     }
 
-    fn gen_code(&mut self, ast: &AST) -> Result<(), CodeGenError> {
+    fn gen_code(&mut self, ast: &Ast) -> Result<(), CodeGenError> {
         self.gen_expr(ast)?;
         self.inc_pc()?;
         self.insts.push(Instruction::Match);
         Ok(())
     }
 
-    fn gen_seq(&mut self, exprs: &[AST]) -> Result<(), CodeGenError> {
+    fn gen_seq(&mut self, exprs: &[Ast]) -> Result<(), CodeGenError> {
         for e in exprs {
             self.gen_expr(e)?;
         }
@@ -63,7 +63,7 @@ impl Generator {
     ///     spilit L1, L2
     /// L2:
     /// ```
-    fn gen_plus(&mut self, e: &AST) -> Result<(), CodeGenError> {
+    fn gen_plus(&mut self, e: &Ast) -> Result<(), CodeGenError> {
         // L1: e
         let l1 = self.pc;
         self.gen_expr(e)?;
@@ -81,7 +81,7 @@ impl Generator {
     ///     jump L1
     /// L3:
     /// ```
-    fn gen_star(&mut self, e: &AST) -> Result<(), CodeGenError> {
+    fn gen_star(&mut self, e: &Ast) -> Result<(), CodeGenError> {
         let l1 = self.pc;
         // L1: split L2, L3
         self.inc_pc()?;
@@ -107,7 +107,7 @@ impl Generator {
     /// split L1, L2
     /// L1: e
     /// L2:
-    fn gen_question(&mut self, e: &AST) -> Result<(), CodeGenError> {
+    fn gen_question(&mut self, e: &Ast) -> Result<(), CodeGenError> {
         // split L1, L2
         let split_addr = self.pc;
         self.inc_pc()?;
@@ -125,14 +125,14 @@ impl Generator {
             Err(CodeGenError::FailQuestion)
         }
     }
-    fn gen_expr(&mut self, ast: &AST) -> Result<(), CodeGenError> {
+    fn gen_expr(&mut self, ast: &Ast) -> Result<(), CodeGenError> {
         match ast {
-            AST::Char(c) => self.gen_char(*c)?,
-            AST::Or(e1, e2) => self.gen_or(e1, e2)?,
-            AST::Plus(e) => self.gen_plus(e)?,
-            AST::Star(e) => self.gen_star(e)?,
-            AST::Question(e) => self.gen_question(e)?,
-            AST::Seq(v) => self.gen_seq(v)?,
+            Ast::Char(c) => self.gen_char(*c)?,
+            Ast::Or(e1, e2) => self.gen_or(e1, e2)?,
+            Ast::Plus(e) => self.gen_plus(e)?,
+            Ast::Star(e) => self.gen_star(e)?,
+            Ast::Question(e) => self.gen_question(e)?,
+            Ast::Seq(v) => self.gen_seq(v)?,
         }
         Ok(())
     }
@@ -144,7 +144,7 @@ impl Generator {
     /// L2: e2
     /// L3:
     /// ```
-    fn gen_or(&mut self, e1: &AST, e2: &AST) -> Result<(), CodeGenError> {
+    fn gen_or(&mut self, e1: &Ast, e2: &Ast) -> Result<(), CodeGenError> {
         // split L1, L2
         let split_addr = self.pc;
         self.inc_pc()?;

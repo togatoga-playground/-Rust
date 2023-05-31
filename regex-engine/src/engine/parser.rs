@@ -5,13 +5,13 @@ use std::{
 };
 
 #[derive(Debug)]
-pub enum AST {
+pub enum Ast {
     Char(char),
-    Plus(Box<AST>),
-    Star(Box<AST>),
-    Question(Box<AST>),
-    Or(Box<AST>, Box<AST>),
-    Seq(Vec<AST>),
+    Plus(Box<Ast>),
+    Star(Box<Ast>),
+    Question(Box<Ast>),
+    Or(Box<Ast>, Box<Ast>),
+    Seq(Vec<Ast>),
 }
 
 #[derive(Debug)]
@@ -45,15 +45,15 @@ impl Display for ParseError {
 
 impl Error for ParseError {}
 
-fn parse_escape(pos: usize, c: char) -> Result<AST, ParseError> {
+fn parse_escape(pos: usize, c: char) -> Result<Ast, ParseError> {
     match c {
-        '\\' | '(' | ')' | '|' | '+' | '*' | '?' => Ok(AST::Char(c)),
+        '\\' | '(' | ')' | '|' | '+' | '*' | '?' => Ok(Ast::Char(c)),
         _ => Err(ParseError::InvalidEscape(pos, c)),
     }
 }
 
 /// `PSQ` is for `parse_plus_star_question`
-enum PSQ {
+enum Psq {
     Plus,
     Star,
     Question,
@@ -61,15 +61,15 @@ enum PSQ {
 
 /// a+ a? (abc|def)*
 fn parse_plus_star_question(
-    seq: &mut Vec<AST>,
-    ast_type: PSQ,
+    seq: &mut Vec<Ast>,
+    ast_type: Psq,
     pos: usize,
 ) -> Result<(), ParseError> {
     if let Some(prev) = seq.pop() {
         let ast = match ast_type {
-            PSQ::Plus => AST::Plus(Box::new(prev)),
-            PSQ::Star => AST::Star(Box::new(prev)),
-            PSQ::Question => AST::Question(Box::new(prev)),
+            Psq::Plus => Ast::Plus(Box::new(prev)),
+            Psq::Star => Ast::Star(Box::new(prev)),
+            Psq::Question => Ast::Question(Box::new(prev)),
         };
         seq.push(ast);
         Ok(())
@@ -79,19 +79,19 @@ fn parse_plus_star_question(
 }
 
 /// abc|def|ghi AST::Or("abc", AST::Or("def", "ghi"))
-fn fold_or(mut seq_or: Vec<AST>) -> Option<AST> {
+fn fold_or(mut seq_or: Vec<Ast>) -> Option<Ast> {
     if seq_or.len() > 1 {
         let mut ast = seq_or.pop().unwrap();
         seq_or.reverse();
         for s in seq_or {
-            ast = AST::Or(Box::new(s), Box::new(ast));
+            ast = Ast::Or(Box::new(s), Box::new(ast));
         }
         Some(ast)
     } else {
         seq_or.pop()
     }
 }
-pub fn parse(expr: &str) -> Result<AST, ParseError> {
+pub fn parse(expr: &str) -> Result<Ast, ParseError> {
     enum ParseState {
         Char,
         Escape,
@@ -105,9 +105,9 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
         match &state {
             ParseState::Char => {
                 match c {
-                    '+' => parse_plus_star_question(&mut seq, PSQ::Plus, i)?,
-                    '*' => parse_plus_star_question(&mut seq, PSQ::Star, i)?,
-                    '?' => parse_plus_star_question(&mut seq, PSQ::Question, i)?,
+                    '+' => parse_plus_star_question(&mut seq, Psq::Plus, i)?,
+                    '*' => parse_plus_star_question(&mut seq, Psq::Star, i)?,
+                    '?' => parse_plus_star_question(&mut seq, Psq::Question, i)?,
                     '(' => {
                         let prev = take(&mut seq);
                         let prev_or = take(&mut seq_or);
@@ -117,7 +117,7 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
                         if let Some((mut prev, prev_or)) = stack.pop() {
                             // ()
                             if !seq.is_empty() {
-                                seq_or.push(AST::Seq(seq));
+                                seq_or.push(Ast::Seq(seq));
                             }
                             if let Some(ast) = fold_or(seq_or) {
                                 prev.push(ast);
@@ -136,11 +136,11 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
                             return Err(ParseError::NoPrev(i));
                         } else {
                             let prev = take(&mut seq);
-                            seq_or.push(AST::Seq(prev));
+                            seq_or.push(Ast::Seq(prev));
                         }
                     }
                     '\\' => state = ParseState::Escape,
-                    _ => seq.push(AST::Char(c)),
+                    _ => seq.push(Ast::Char(c)),
                 }
             }
             ParseState::Escape => {
@@ -156,7 +156,7 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
     }
 
     if !seq.is_empty() {
-        seq_or.push(AST::Seq(seq));
+        seq_or.push(Ast::Seq(seq));
     }
 
     if let Some(ast) = fold_or(seq_or) {
