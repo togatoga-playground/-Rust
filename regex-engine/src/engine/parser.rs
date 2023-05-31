@@ -95,7 +95,7 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
     enum ParseState {
         Char,
         Escape,
-    };
+    }
     let mut seq = Vec::new();
     let mut seq_or = Vec::new();
     let mut stack = Vec::new();
